@@ -6,7 +6,7 @@ Version: 1.0.0
 Author: Mili
 License: GPL-2.0-or-later
 Text Domain: mili-localizer
-Plugin URI: https://github.com/alonezone/miliLocalizer
+Plugin URI: https://github.com/alonezone/mili-localizer
 Author URI: https://github.com/alonezone
 */
 

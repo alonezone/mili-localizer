@@ -1,5 +1,5 @@
 ﻿=== Mili Localizer ===
-Contributors: mili
+Contributors: militools
 Tags: images, media, import, external images, featured image
 Requires at least: 4.7
 Tested up to: 6.9

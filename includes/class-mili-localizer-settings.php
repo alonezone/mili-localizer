@@ -26,7 +26,9 @@ final class Mili_Localizer_Settings {
         register_setting(
             'miel_settings_group',
             Mili_Localizer_Options::OPTION_KEY,
-            array('Mili_Localizer_Options', 'sanitize')
+            array(
+                'sanitize_callback' => array('Mili_Localizer_Options', 'sanitize'),
+            )
         );
 
         add_settings_section('miel_main', 'General Settings', '__return_false', self::SETTINGS_SLUG);
