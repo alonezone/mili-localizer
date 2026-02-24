@@ -14,6 +14,8 @@ final class Mili_Localizer_Options {
             'run_on_publish' => 1,
             'run_on_update' => 1,
             'set_first_as_featured' => 0,
+            'filename_mode' => 'preserve',
+            'random_filename_pattern' => 'mili-{post_id}-{date}-{rand8}',
         );
     }
 
@@ -30,11 +32,9 @@ final class Mili_Localizer_Options {
         $domains = array();
 
         foreach ($parts as $part) {
-            $part = trim(strtolower($part));
-            $part = preg_replace('#^https?://#', '', $part);
-            $part = trim($part, " \t\n\r\0\x0B/");
-            if ($part !== '') {
-                $domains[] = $part;
+            $domain = self::sanitize_domain($part);
+            if ($domain !== '') {
+                $domains[] = $domain;
             }
         }
 
@@ -47,6 +47,12 @@ final class Mili_Localizer_Options {
         $output['run_on_update'] = !empty($input['run_on_update']) ? 1 : 0;
         $output['set_first_as_featured'] = !empty($input['set_first_as_featured']) ? 1 : 0;
 
+        $mode = isset($input['filename_mode']) ? sanitize_key($input['filename_mode']) : $defaults['filename_mode'];
+        $output['filename_mode'] = in_array($mode, array('preserve', 'random'), true) ? $mode : $defaults['filename_mode'];
+
+        $pattern = isset($input['random_filename_pattern']) ? wp_unslash($input['random_filename_pattern']) : $defaults['random_filename_pattern'];
+        $output['random_filename_pattern'] = self::sanitize_filename_pattern($pattern);
+
         return $output;
     }
 
@@ -56,14 +62,36 @@ final class Mili_Localizer_Options {
         $domains = array();
 
         foreach ($parts as $part) {
-            $part = trim(strtolower($part));
-            $part = preg_replace('#^https?://#', '', $part);
-            $part = trim($part, " \t\n\r\0\x0B/");
-            if ($part !== '') {
-                $domains[] = $part;
+            $domain = self::sanitize_domain($part);
+            if ($domain !== '') {
+                $domains[] = $domain;
             }
         }
 
         return array_values(array_unique($domains));
+    }
+
+    private static function sanitize_domain($value) {
+        $value = sanitize_text_field((string) $value);
+        $value = strtolower(trim($value));
+        $value = preg_replace('#^https?://#', '', $value);
+        $value = trim($value, " \t\n\r\0\x0B/");
+
+        // Keep only valid domain characters after generic text sanitization.
+        $value = preg_replace('/[^a-z0-9\.\-]/', '', $value);
+
+        return $value;
+    }
+
+    private static function sanitize_filename_pattern($value) {
+        $value = sanitize_text_field((string) $value);
+        $value = preg_replace('/[^a-zA-Z0-9\-\_\{\}\s]/', '', $value);
+        $value = trim($value);
+
+        if ($value === '') {
+            return self::defaults()['random_filename_pattern'];
+        }
+
+        return $value;
     }
 }

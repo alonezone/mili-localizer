@@ -71,6 +71,8 @@ final class Mili_Localizer_Processor {
         $options = Mili_Localizer_Options::get();
         $excluded_domains = Mili_Localizer_Options::excluded_domains();
         $quality = (int) $options['compression_quality'];
+        $filename_mode = isset($options['filename_mode']) ? $options['filename_mode'] : 'preserve';
+        $random_filename_pattern = isset($options['random_filename_pattern']) ? $options['random_filename_pattern'] : 'mili-{post_id}-{date}-{rand8}';
 
         $content = $post->post_content;
         $source_map = array();
@@ -90,7 +92,7 @@ final class Mili_Localizer_Processor {
             }
 
             if (!isset($source_map[$src])) {
-                $source_map[$src] = $this->import_external_image($src, $post_id, $quality, $alt_text);
+                $source_map[$src] = $this->import_external_image($src, $post_id, $quality, $alt_text, $filename_mode, $random_filename_pattern);
             }
 
             $import_data = $source_map[$src];
@@ -128,7 +130,7 @@ final class Mili_Localizer_Processor {
         }
     }
 
-    private function import_external_image($url, $post_id, $quality, $alt_text = '') {
+    private function import_external_image($url, $post_id, $quality, $alt_text = '', $filename_mode = 'preserve', $random_filename_pattern = '') {
         if (!function_exists('download_url')) {
             require_once ABSPATH . 'wp-admin/includes/file.php';
         }
@@ -147,11 +149,8 @@ final class Mili_Localizer_Processor {
         $this->compress_image($tmp_file, $quality);
 
         $path = wp_parse_url($url, PHP_URL_PATH);
-        $filename = $path ? wp_basename($path) : '';
-
-        if ($filename === '') {
-            $filename = 'external-image-' . wp_generate_password(8, false) . '.jpg';
-        }
+        $original_filename = $path ? wp_basename($path) : '';
+        $filename = $this->build_upload_filename($original_filename, $tmp_file, $post_id, $filename_mode, $random_filename_pattern);
 
         $file = array(
             'name' => sanitize_file_name($filename),
@@ -160,7 +159,7 @@ final class Mili_Localizer_Processor {
 
         $attachment_id = media_handle_sideload($file, $post_id);
         if (is_wp_error($attachment_id)) {
-            @unlink($tmp_file);
+            @wp_delete_file($tmp_file);
             return array();
         }
 
@@ -210,7 +209,7 @@ final class Mili_Localizer_Processor {
         }
 
         foreach ($excluded_domains as $domain) {
-            if ($host === $domain || str_ends_with($host, '.' . $domain)) {
+            if ($host === $domain || $this->ends_with($host, '.' . $domain)) {
                 return false;
             }
         }
@@ -238,7 +237,7 @@ final class Mili_Localizer_Processor {
             return true;
         }
 
-        if (str_ends_with($host, '.' . $site_nw) || str_ends_with($site_nw, '.' . $host)) {
+        if ($this->ends_with($host, '.' . $site_nw) || $this->ends_with($site_nw, '.' . $host)) {
             return true;
         }
 
@@ -263,5 +262,81 @@ final class Mili_Localizer_Processor {
         if ($existing_alt === '') {
             update_post_meta($attachment_id, '_wp_attachment_image_alt', $alt_text);
         }
+    }
+
+    private function build_upload_filename($original_filename, $tmp_file, $post_id, $filename_mode, $pattern) {
+        $extension = $this->detect_extension($original_filename, $tmp_file);
+
+        if ($filename_mode === 'random') {
+            $base = $this->build_random_filename_base($pattern, $post_id);
+            return $base . '.' . $extension;
+        }
+
+        $original_filename = sanitize_file_name((string) $original_filename);
+        if ($original_filename !== '') {
+            return $original_filename;
+        }
+
+        return 'external-image-' . wp_generate_password(8, false) . '.' . $extension;
+    }
+
+    private function build_random_filename_base($pattern, $post_id) {
+        $timestamp = current_time('timestamp');
+        $replacements = array(
+            '{post_id}' => (string) (int) $post_id,
+            '{date}' => gmdate('Ymd', $timestamp),
+            '{time}' => gmdate('His', $timestamp),
+            '{datetime}' => gmdate('Ymd-His', $timestamp),
+            '{rand4}' => wp_generate_password(4, false),
+            '{rand8}' => wp_generate_password(8, false),
+            '{uniqid}' => uniqid(),
+        );
+
+        $base = strtr((string) $pattern, $replacements);
+        $base = sanitize_file_name($base);
+        $base = pathinfo($base, PATHINFO_FILENAME);
+        $base = trim($base, '.-_ ');
+
+        if ($base === '') {
+            $base = 'image-' . (int) $post_id . '-' . wp_generate_password(8, false);
+        }
+
+        return $base;
+    }
+
+    private function detect_extension($original_filename, $tmp_file) {
+        $extension = strtolower(pathinfo((string) $original_filename, PATHINFO_EXTENSION));
+        if ($extension !== '') {
+            return $extension;
+        }
+
+        $mime = wp_get_image_mime($tmp_file);
+        $map = array(
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'image/bmp' => 'bmp',
+            'image/tiff' => 'tif',
+            'image/svg+xml' => 'svg',
+        );
+
+        return isset($map[$mime]) ? $map[$mime] : 'jpg';
+    }
+
+    private function ends_with($haystack, $needle) {
+        $haystack = (string) $haystack;
+        $needle = (string) $needle;
+        $length = strlen($needle);
+
+        if ($length === 0) {
+            return true;
+        }
+
+        if (strlen($haystack) < $length) {
+            return false;
+        }
+
+        return substr($haystack, -$length) === $needle;
     }
 }

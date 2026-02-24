@@ -38,6 +38,8 @@ final class Mili_Localizer_Settings {
         add_settings_field('run_on_publish', 'Run On Publish', array($this, 'render_run_on_publish_field'), self::SETTINGS_SLUG, 'miel_main');
         add_settings_field('run_on_update', 'Run On Update', array($this, 'render_run_on_update_field'), self::SETTINGS_SLUG, 'miel_main');
         add_settings_field('set_first_as_featured', 'Set First Imported Image As Featured Image', array($this, 'render_set_featured_field'), self::SETTINGS_SLUG, 'miel_main');
+        add_settings_field('filename_mode', 'Image File Naming', array($this, 'render_filename_mode_field'), self::SETTINGS_SLUG, 'miel_main');
+        add_settings_field('random_filename_pattern', 'Random Filename Pattern', array($this, 'render_filename_pattern_field'), self::SETTINGS_SLUG, 'miel_main');
     }
 
     public function render_settings_page() {
@@ -101,6 +103,25 @@ final class Mili_Localizer_Settings {
             <input type="checkbox" name="<?php echo esc_attr(Mili_Localizer_Options::OPTION_KEY); ?>[set_first_as_featured]" value="1" <?php checked(1, (int) $options['set_first_as_featured']); ?> />
             If no featured image exists, use the first imported image as featured image.
         </label>
+        <?php
+    }
+
+    public function render_filename_mode_field() {
+        $options = Mili_Localizer_Options::get();
+        ?>
+        <select name="<?php echo esc_attr(Mili_Localizer_Options::OPTION_KEY); ?>[filename_mode]">
+            <option value="preserve" <?php selected('preserve', $options['filename_mode']); ?>>Preserve original filename</option>
+            <option value="random" <?php selected('random', $options['filename_mode']); ?>>Use random pattern</option>
+        </select>
+        <p class="description">Choose whether imported images keep original names or use your custom random pattern.</p>
+        <?php
+    }
+
+    public function render_filename_pattern_field() {
+        $options = Mili_Localizer_Options::get();
+        ?>
+        <input type="text" class="regular-text code" name="<?php echo esc_attr(Mili_Localizer_Options::OPTION_KEY); ?>[random_filename_pattern]" value="<?php echo esc_attr($options['random_filename_pattern']); ?>" />
+        <p class="description">Used only in random mode. Tokens: {post_id}, {date}, {time}, {datetime}, {rand4}, {rand8}, {uniqid}</p>
         <?php
     }
 }
